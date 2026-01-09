@@ -3,7 +3,9 @@ const express = require("express");
 const app = express();
 const cors = require("cors");
 const { connect } = require("./db");
+
 const router = require("./Routes/index");
+const authRouter = require("./Routes/auth");
 const port = process.env.PORT || 5000;
 
 app.use(cors());
@@ -14,6 +16,9 @@ app.use(express.json());
 app.get("/", (req, res) => {
   res.send("hello this is internshala backend");
 });
+
+// Mount auth explicitly to avoid any aggregator/mount mismatch in production builds.
+app.use("/api/auth", authRouter);
 app.use("/api", router);
 connect();
 app.use((req, res, next) => {
