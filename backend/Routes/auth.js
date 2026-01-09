@@ -8,6 +8,7 @@ const nodemailer = require("nodemailer");
 const firebaseAdmin = require("../firebaseAdmin");
 const User = require("../Model/User");
 const { generatePassword } = require("../utils/passwordGenerator");
+const { requireAuth } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -77,7 +78,9 @@ router.post(
         });
       }
 
-      // Lookup Firebase user first (keeps Firebase and DB consistent)
+      // Platform auth reality: Google Sign-In only.
+      // Lookup user in Firebase first so real Google users are not treated as "User not found"
+      // even if they haven't hit any protected endpoints yet.
       let firebaseUser;
       try {
         firebaseUser = isEmailInput
@@ -87,20 +90,23 @@ router.post(
         return res.status(404).json({ error: "User not found." });
       }
 
-      const firebaseUid = firebaseUser.uid;
-
-      // Ensure we have a Mongo user doc
       const mongoUser = await User.findOneAndUpdate(
-        { firebaseUid },
+        { firebaseUid: firebaseUser.uid },
         {
           $setOnInsert: {
-            firebaseUid,
+            firebaseUid: firebaseUser.uid,
             friendsCount: 0,
+            provider: "google",
+            password: null,
+            passwordHash: "",
           },
           $set: {
-            email: firebaseUser.email || "",
+            email: (firebaseUser.email || "").toLowerCase(),
             name: firebaseUser.displayName || firebaseUser.email || "",
             phoneNumber: firebaseUser.phoneNumber || "",
+            provider: "google",
+            password: null,
+            passwordHash: "",
           },
         },
         { new: true, upsert: true }
@@ -111,37 +117,21 @@ router.post(
         return res.status(429).json({ error: "You can use this option only once per day." });
       }
 
-      const newPassword = generatePassword();
-
-      // Update Firebase Auth password
-      await firebaseAdmin.auth().updateUser(firebaseUid, { password: newPassword });
-
-      // Hash + store in Mongo for verifiability
-      const passwordHash = await bcrypt.hash(newPassword, 10);
-      mongoUser.passwordHash = passwordHash;
+      // Track daily usage even though password reset is not applicable.
       mongoUser.lastPasswordResetAt = new Date();
       await mongoUser.save();
 
-      if (isEmailInput) {
-        const emailResult = await sendResetEmail(identifier, newPassword);
-        return res.status(200).json({
-          success: true,
-          message: "A new password has been sent to your registered email/phone.",
-          delivery: { type: "email", mode: emailResult.mode },
-        });
-      }
-
-      // Phone flow: SMS mock allowed, return password in response
-      return res.status(200).json({
-        success: true,
-        message: "A new password has been sent to your registered email/phone.",
-        delivery: { type: "phone", mode: "mock" },
-        password: newPassword,
+      return res.status(400).json({
+        error: "This platform supports Google Sign-In only. Password reset is not applicable.",
       });
     } catch (error) {
-      return res.status(500).json({ error: "internal server error" });
+      return res.status(500).json({ error: "Password reset failed due to a server error." });
     }
   }
 );
+
+router.post("/sync", requireAuth, async (req, res) => {
+  return res.status(200).json({ success: true });
+});
 
 module.exports = router;

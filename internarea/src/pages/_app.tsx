@@ -7,6 +7,7 @@ import { Provider, useDispatch } from "react-redux";
 import { useEffect } from "react";
 import { auth } from "@/firebase/firebase";
 import { login, logout } from "@/Feature/Userslice";
+import axios from "axios";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 export default function App({ Component, pageProps }: AppProps) {
@@ -24,6 +25,22 @@ export default function App({ Component, pageProps }: AppProps) {
               phoneNumber: authuser.phoneNumber,
             })
           );
+
+          const API_BASE =
+            process.env.NEXT_PUBLIC_API_BASE_URL ||
+            "https://internshala-clone-7les.onrender.com";
+          authuser
+            .getIdToken()
+            .then((token) =>
+              axios.post(
+                `${API_BASE}/api/auth/sync`,
+                {},
+                { headers: { Authorization: `Bearer ${token}` } }
+              )
+            )
+            .catch(() => {
+              // best-effort sync
+            });
         } else {
           dispatch(logout());
         }

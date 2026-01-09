@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
       }
     } catch (err: unknown) {
       const e = err as { response?: { data?: ApiError; status?: number } };
-      const msg = e.response?.data?.error || "Something went wrong";
+      const msg = e.response?.data?.error || "Password reset failed due to a server error.";
       setServerError(msg);
     } finally {
       setSubmitting(false);

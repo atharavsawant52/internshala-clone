@@ -9,6 +9,12 @@ const UserSchema = new mongoose.Schema(
       index: true,
       trim: true,
     },
+    provider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
+      index: true,
+    },
     name: {
       type: String,
       default: "",
@@ -35,6 +41,11 @@ const UserSchema = new mongoose.Schema(
     // Task-2 (Forgot Password): enforced server-side
     lastPasswordResetAt: {
       type: Date,
+      default: null,
+    },
+    // Task-2 (Forgot Password): bcrypt hash for local users. Google users must have this as null.
+    password: {
+      type: String,
       default: null,
     },
     // Stored to make reset flow verifiable (Firebase remains source of truth for auth)

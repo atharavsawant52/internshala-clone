@@ -22,11 +22,24 @@ async function requireAuth(req, res, next) {
     const name = decoded.name || decoded.email || "";
     const phoneNumber = decoded.phone_number || "";
 
+    const signInProvider = decoded.firebase && decoded.firebase.sign_in_provider;
+    const isGoogle = signInProvider === "google.com";
+
     const user = await User.findOneAndUpdate(
       { firebaseUid },
       {
-        $setOnInsert: { firebaseUid, friendsCount: 0 },
-        $set: { email, name, phoneNumber },
+        $setOnInsert: {
+          firebaseUid,
+          friendsCount: 0,
+          provider: isGoogle ? "google" : "local",
+        },
+        $set: {
+          email,
+          name,
+          phoneNumber,
+          provider: isGoogle ? "google" : "local",
+          ...(isGoogle ? { password: null, passwordHash: "" } : {}),
+        },
       },
       { new: true, upsert: true }
     );
