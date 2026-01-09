@@ -7,6 +7,7 @@ import { signInWithPopup, signOut } from "firebase/auth";
 import { toast } from "react-toastify";
 import { useSelector } from "react-redux";
 import { selectuser } from "@/Feature/Userslice";
+ import { useRouter } from "next/router";
 interface User {
   name: string;
   email: string;
@@ -14,6 +15,8 @@ interface User {
 }
 const Navbar = () => {
   const user = useSelector(selectuser);
+  const router = useRouter();
+  const isPublicSpaceActive = router.pathname === "/public-space";
   const handlelogin = async () => {
     try {
       await signInWithPopup(auth, provider);
@@ -53,6 +56,17 @@ const Navbar = () => {
               <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-600">
                 <Link href={"/job"}>
                   <span>Jobs</span>
+                </Link>
+              </button>
+              <button
+                className={`flex items-center space-x-1 hover:text-blue-600 ${
+                  isPublicSpaceActive
+                    ? "text-blue-600 font-semibold"
+                    : "text-gray-700"
+                }`}
+              >
+                <Link href={"/public-space"}>
+                  <span>Public Space</span>
                 </Link>
               </button>
               <div className="flex items-center bg-gray-100 rounded-full px-4 py-2">
