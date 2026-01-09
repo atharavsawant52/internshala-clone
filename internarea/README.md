@@ -38,3 +38,13 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+
+## Task-1 (Public Space) evaluation note
+
+Friend system is out of scope for Task-1; `friendCount` is temporarily simulated for evaluation.
+
+- **[frontend]** Public Space page includes an **Evaluation only** input to simulate `friendCount`.
+- **[backend]** Posting-limit checks support a **TEMP / DEV / EVALUATION ONLY** override via request header:
+  - `x-friends-count: <number>`
+
+This makes posting limits testable without editing the database.

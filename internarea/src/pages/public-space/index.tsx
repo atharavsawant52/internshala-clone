@@ -18,7 +18,7 @@ type FeedPost = {
   };
 };
 
-const API_BASE = "https://internshala-clone-y2p2.onrender.com";
+const API_BASE = "https://internshala-clone-7les.onrender.com";
 
 /**
  * NOTE:
@@ -31,21 +31,25 @@ export default function PublicSpacePage() {
   const user = useSelector(selectuser);
 
   const [caption, setCaption] = useState("");
-  const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaType, setMediaType] = useState<"image" | "video" | "">("");
+  const [mediaUrl, setMediaUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [postingLimitReached, setPostingLimitReached] = useState(false);
+  const [noFriendsBlocked, setNoFriendsBlocked] = useState(false);
+  const [simulatedFriendsCount, setSimulatedFriendsCount] = useState("");
 
   const [feedLoading, setFeedLoading] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
 
   const canSubmit = useMemo(() => {
+    const sim = simulatedFriendsCount.trim();
     if (!user) return false;
     if (postingLimitReached) return false;
+    if (noFriendsBlocked) return false;
+    if (sim === "0") return false;
     if (submitting) return false;
-    return caption.trim().length > 0 || Boolean(mediaFile);
-  }, [user, postingLimitReached, submitting, caption, mediaFile]);
+    return caption.trim().length > 0 || mediaUrl.trim().length > 0;
+  }, [user, postingLimitReached, noFriendsBlocked, simulatedFriendsCount, submitting, caption, mediaUrl]);
 
   const fetchPosts = async () => {
     try {
@@ -70,26 +74,12 @@ export default function PublicSpacePage() {
     fetchPosts();
   }, []);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-
-    if (!file) {
-      setMediaFile(null);
-      setMediaType("");
-      return;
-    }
-
-    const isImage = file.type.startsWith("image/");
-    const isVideo = file.type.startsWith("video/");
-
-    if (!isImage && !isVideo) {
-      toast.error("Only image or video files are allowed");
-      e.target.value = "";
-      return;
-    }
-
-    setMediaFile(file);
-    setMediaType(isImage ? "image" : "video");
+  const inferMediaTypeFromUrl = (url: string): "image" | "video" | "" => {
+    const u = url.toLowerCase();
+    if (!u) return "";
+    if (u.match(/\.(mp4|webm|ogg)(\?|#|$)/)) return "video";
+    if (u.match(/\.(png|jpg|jpeg|gif|webp)(\?|#|$)/)) return "image";
+    return "image";
   };
 
   const getAuthHeader = async () => {
@@ -106,6 +96,7 @@ export default function PublicSpacePage() {
     try {
       setSubmitting(true);
       setPostingLimitReached(false);
+      setNoFriendsBlocked(false);
 
       const headers = await getAuthHeader();
       if (!headers) {
@@ -113,20 +104,34 @@ export default function PublicSpacePage() {
         return;
       }
 
+      const trimmedMediaUrl = mediaUrl.trim();
+      const inferredMediaType = trimmedMediaUrl
+        ? inferMediaTypeFromUrl(trimmedMediaUrl)
+        : "";
+
+      const override = Number(simulatedFriendsCount);
+      const evaluationHeaders =
+        simulatedFriendsCount.trim().length > 0 && Number.isFinite(override)
+          ? { "x-friends-count": String(Math.max(0, Math.floor(override))) }
+          : {};
+
       // Backend currently expects mediaUrl as string.
-      // Media upload can be integrated later.
       const payload = {
         caption: caption.trim(),
-        mediaUrl: "",
-        mediaType,
+        mediaUrl: trimmedMediaUrl,
+        mediaType: inferredMediaType,
       };
 
-      await axios.post(`${API_BASE}/api/posts`, payload, { headers });
+      await axios.post(`${API_BASE}/api/posts`, payload, {
+        headers: {
+          ...headers,
+          ...evaluationHeaders,
+        },
+      });
 
       toast.success("Post created");
       setCaption("");
-      setMediaFile(null);
-      setMediaType("");
+      setMediaUrl("");
       fetchPosts();
     } catch (err: any) {
       const status = err?.response?.status;
@@ -134,6 +139,10 @@ export default function PublicSpacePage() {
 
       if (status === 429) {
         setPostingLimitReached(true);
+      }
+
+      if (status === 403) {
+        setNoFriendsBlocked(true);
       }
 
       toast.error(message);
@@ -178,6 +187,25 @@ export default function PublicSpacePage() {
                     Posting limits depend on your connections.
                   </div>
 
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                    <div className="font-medium">Evaluation only</div>
+                    <div className="text-gray-500">
+                      Friend system is out of scope. Use this to simulate friendCount.
+                    </div>
+                    <div className="mt-2">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Simulated friendCount
+                      </label>
+                      <input
+                        value={simulatedFriendsCount}
+                        onChange={(e) => setSimulatedFriendsCount(e.target.value)}
+                        inputMode="numeric"
+                        placeholder="e.g. 0, 1, 2, 10"
+                        className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                      />
+                    </div>
+                  </div>
+
                   <textarea
                     value={caption}
                     onChange={(e) => setCaption(e.target.value)}
@@ -187,20 +215,21 @@ export default function PublicSpacePage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Upload image / video
+                      Image/Video URL (optional)
                     </label>
                     <input
-                      type="file"
-                      accept="image/*,video/*"
-                      onChange={handleFileChange}
-                      className="block w-full text-sm"
+                      value={mediaUrl}
+                      onChange={(e) => setMediaUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="block w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                     />
-                    {mediaFile && (
-                      <div className="mt-1 text-xs text-gray-500">
-                        Selected: {mediaFile.name}
-                      </div>
-                    )}
                   </div>
+
+                  {(noFriendsBlocked || simulatedFriendsCount.trim() === "0") && (
+                    <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+                      You need at least 1 friend to create a post.
+                    </div>
+                  )}
 
                   {postingLimitReached && (
                     <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
@@ -247,7 +276,7 @@ export default function PublicSpacePage() {
                 </div>
               ) : posts.length === 0 ? (
                 <div className="mt-4 rounded-lg border bg-gray-50 p-6 text-center text-gray-500">
-                  No posts yet. Posting is unlocked as you build connections.
+                  No posts yet. Add friends to start posting.
                 </div>
               ) : (
                 <div className="mt-4 space-y-4">
