@@ -20,12 +20,13 @@ async function requireAuth(req, res, next) {
     const firebaseUid = decoded.uid;
     const email = decoded.email || "";
     const name = decoded.name || decoded.email || "";
+    const phoneNumber = decoded.phone_number || "";
 
     const user = await User.findOneAndUpdate(
       { firebaseUid },
       {
         $setOnInsert: { firebaseUid, friendsCount: 0 },
-        $set: { email, name },
+        $set: { email, name, phoneNumber },
       },
       { new: true, upsert: true }
     );
