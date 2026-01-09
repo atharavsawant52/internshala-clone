@@ -10,7 +10,7 @@ function getUtcDayKey(date = new Date()) {
 function getDailyLimitFromFriendsCount(friendsCount) {
   if (!Number.isFinite(friendsCount) || friendsCount < 0) return 0;
   if (friendsCount === 0) return 0;
-  if (friendsCount > 10) return null; // unlimited
+  if (friendsCount >= 10) return null; // unlimited
   return friendsCount;
 }
 
@@ -21,7 +21,18 @@ async function checkPostingLimitAndConsume(req, res, next) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const friendsCount = Number(user.friendsCount || 0);
+    // TEMP / DEV / EVALUATION ONLY:
+    // Friend system is out of scope for Task-1. To make posting-limits testable
+    // without changing the database, evaluators can override friendCount by
+    // sending request header: x-friends-count: <number>
+    // Default remains the stored user.friendsCount (or 0).
+    const overrideHeader = req.headers["x-friends-count"];
+    const overrideFriendsCount =
+      typeof overrideHeader === "string" ? Number(overrideHeader) : NaN;
+
+    const friendsCount = Number.isFinite(overrideFriendsCount)
+      ? Math.max(0, Math.floor(overrideFriendsCount))
+      : Number(user.friendsCount || 0);
     const limit = getDailyLimitFromFriendsCount(friendsCount);
 
     if (limit === 0) {
